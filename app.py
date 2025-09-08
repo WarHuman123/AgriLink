@@ -29,7 +29,7 @@ def get_whatsapp_link(number, message):
 if os.path.exists(CSV_FILE):
     df = pd.read_csv(CSV_FILE)
 else:
-    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
+    df = pd.DataFrame(columns=["Name", "Role", "Detail", "Quantity", "Address",
                                "Contact", "Bank Details", "Edit Code"])
     df.to_csv(CSV_FILE, index=False)
 
@@ -63,7 +63,16 @@ if st.sidebar.button("↪️ Redo"):
 with st.form("entry_form"):
     name = st.text_input("Your Name")
     role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
-    crop_or_need = st.text_input("Crop (if Farmer) / Requirement (if Buyer) / Support (if Volunteer)")
+    
+    # Dynamic label based on role
+    if role == "Farmer":
+        detail_label = "Crop Name / Type"
+    elif role == "Buyer":
+        detail_label = "Requirement / Product Needed"
+    else:
+        detail_label = "Support / Help Offered"
+        
+    detail = st.text_input(detail_label)
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
@@ -71,12 +80,12 @@ with st.form("entry_form"):
     submitted = st.form_submit_button("Submit")
 
 if submitted:
-    if name and role and crop_or_need and address and contact:
+    if name and role and detail and address and contact:
         edit_code = generate_code()
         new_entry = {
             "Name": name,
             "Role": role,
-            "Crop/Need": crop_or_need,
+            "Detail": detail,
             "Quantity": quantity,
             "Address": address,
             "Contact": contact,
@@ -94,10 +103,8 @@ if submitted:
             message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
         elif role == "Buyer":
             message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}."
-        elif role == "Volunteer":
-            message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
         else:
-            message = f"Hello {name}, thanks for joining AgriLink! Your edit code is {edit_code}."
+            message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
 
         wa_link = get_whatsapp_link(contact, message)
         if wa_link:
@@ -118,7 +125,7 @@ if st.button("Find Entry"):
         action = st.radio("Choose action:", ["Edit", "Delete"])
         if action == "Edit":
             new_name = st.text_input("Name", entry.iloc[0]["Name"])
-            new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"])
+            new_detail = st.text_input(detail_label, entry.iloc[0]["Detail"])
             new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"])
             new_address = st.text_area("Address", entry.iloc[0]["Address"])
             new_contact = st.text_input("Contact", entry.iloc[0]["Contact"])
@@ -126,8 +133,8 @@ if st.button("Find Entry"):
 
             if st.button("Save Changes"):
                 st.session_state.history.append(df.copy())
-                df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
-                    new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
+                df.loc[df["Edit Code"] == edit_code_input, ["Name", "Detail", "Quantity", "Address", "Contact", "Bank Details"]] = [
+                    new_name, new_detail, new_quantity, new_address, new_contact, new_bank
                 ]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("✅ Entry updated successfully!")
