@@ -104,6 +104,10 @@ if submitted:
             st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
         else:
             st.warning("⚠️ Phone number invalid. Could not generate WhatsApp link.")
+
+        # --- NEW: rerun so the table updates instantly ---
+        st.experimental_rerun()
+
     else:
         st.error("❌ Please fill in all required fields.")
 
@@ -131,6 +135,8 @@ if st.button("Find Entry"):
                 ]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("✅ Entry updated successfully!")
+                # rerun so UI shows updated table
+                st.experimental_rerun()
 
         elif action == "Delete":
             if st.button("Confirm Delete"):
@@ -138,6 +144,8 @@ if st.button("Find Entry"):
                 df = df[df["Edit Code"] != edit_code_input]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("🗑️ Entry deleted successfully!")
+                # rerun so UI shows updated table
+                st.experimental_rerun()
     else:
         st.error("❌ No entry found with that edit code.")
 
@@ -147,8 +155,11 @@ tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 with tab1:
     st.write("👨‍🌾 Farmers and their crops:")
     farmers = df[df["Role"] == "Farmer"]
-    farmers = farmers.drop(columns=[c for c in ["Edit Code"] if c in farmers.columns])
+    # --- NEW: reset index for clean serial numbers ---
     if not farmers.empty:
+        farmers = farmers.reset_index(drop=True)
+        farmers.index = farmers.index + 1
+        farmers = farmers.drop(columns=[c for c in ["Edit Code"] if c in farmers.columns])
         st.dataframe(farmers, use_container_width=True)
     else:
         st.info("No farmers yet.")
@@ -156,8 +167,10 @@ with tab1:
 with tab2:
     st.write("🛒 Buyers and their requirements:")
     buyers = df[df["Role"] == "Buyer"]
-    buyers = buyers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in buyers.columns])
     if not buyers.empty:
+        buyers = buyers.reset_index(drop=True)
+        buyers.index = buyers.index + 1
+        buyers = buyers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in buyers.columns])
         st.dataframe(buyers, use_container_width=True)
     else:
         st.info("No buyers yet.")
@@ -165,8 +178,10 @@ with tab2:
 with tab3:
     st.write("🤝 Volunteers and their offers:")
     volunteers = df[df["Role"] == "Volunteer"]
-    volunteers = volunteers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in volunteers.columns])
     if not volunteers.empty:
+        volunteers = volunteers.reset_index(drop=True)
+        volunteers.index = volunteers.index + 1
+        volunteers = volunteers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in volunteers.columns])
         st.dataframe(volunteers, use_container_width=True)
     else:
         st.info("No volunteers yet.")
