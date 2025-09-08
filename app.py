@@ -111,7 +111,7 @@ if submitted:
         if wa_link:
             st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
         else:
-            st.warning("⚠️ Phone number invalid or WhatsApp not available.")
+            st.warning("⚠️ Phone number invalid or WhatsApp not available. Registration cannot proceed.")
 
     else:
         st.error("❌ Please fill in all required fields.")
@@ -153,23 +153,29 @@ if st.button("Find Entry"):
 # Tabs
 tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
-# Farmers
-farmers = df[df["Role"] == "Farmer"]
-if not farmers.empty:
-    st.dataframe(farmers.reset_index(drop=True), use_container_width=True)
-else:
-    st.info("No farmers yet.")
+with tab1:
+    st.write("👨‍🌾 Farmers and their crops:")
+    farmers = df[df["Role"] == "Farmer"]
+    farmers = farmers.drop(columns=[c for c in ["Edit Code"] if c in farmers.columns])
+    if not farmers.empty:
+        st.dataframe(farmers.reset_index(drop=True), use_container_width=True)
+    else:
+        st.info("No farmers yet.")
 
-# Buyers
-buyers = df[df["Role"] == "Buyer"]
-if not buyers.empty:
-    st.dataframe(buyers.reset_index(drop=True), use_container_width=True)
-else:
-    st.info("No buyers yet.")
+with tab2:
+    st.write("🛒 Buyers and their requirements:")
+    buyers = df[df["Role"] == "Buyer"]
+    buyers = buyers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in buyers.columns])
+    if not buyers.empty:
+        st.dataframe(buyers.reset_index(drop=True), use_container_width=True)
+    else:
+        st.info("No buyers yet.")
 
-# Volunteers
-volunteers = df[df["Role"] == "Volunteer"]
-if not volunteers.empty:
-    st.dataframe(volunteers.reset_index(drop=True), use_container_width=True)
-else:
-    st.info("No volunteers yet.")
+with tab3:
+    st.write("🤝 Volunteers and their offers:")
+    volunteers = df[df["Role"] == "Volunteer"]
+    volunteers = volunteers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in volunteers.columns])
+    if not volunteers.empty:
+        st.dataframe(volunteers.reset_index(drop=True), use_container_width=True)
+    else:
+        st.info("No volunteers yet.")
