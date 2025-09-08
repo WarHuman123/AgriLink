@@ -15,10 +15,10 @@ def generate_code(length=6):
 # WhatsApp link generator
 def get_whatsapp_link(number, message):
     try:
-        parsed = phonenumbers.parse(number, "IN")  # Default India
+        parsed = phonenumbers.parse(number, "IN")
         if phonenumbers.is_valid_number(parsed):
             clean_number = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-            link = f"https://wa.me/{clean_number.replace('+', '')}?text={message.replace(' ', '%20')}"
+            link = f"https://wa.me/{clean_number.replace('+','')}?text={message.replace(' ', '%20')}"
             return link
         else:
             return None
@@ -59,25 +59,20 @@ if st.sidebar.button("↪️ Redo"):
         df.to_csv(CSV_FILE, index=False)
         st.sidebar.success("Redid last change")
 
-# Role selection outside the form
-role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select")
+# Role selection
+role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
 
 # Determine the label dynamically
-if role == "Farmer":
-    crop_label = "Crop"
-elif role == "Buyer":
-    crop_label = "Requirement"
-else:
-    crop_label = "Support"
+crop_label = {"Farmer": "Crop", "Buyer": "Requirement", "Volunteer": "Support"}[role]
 
-# Form
+# Entry form
 with st.form("entry_form"):
     name = st.text_input("Your Name")
     crop_or_need = st.text_input(crop_label)
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
-    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role == "Farmer" else ""
+    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role=="Farmer" else ""
     submitted = st.form_submit_button("Submit")
 
 if submitted:
@@ -90,55 +85,49 @@ if submitted:
             "Quantity": quantity,
             "Address": address,
             "Contact": contact,
-            "Bank Details": bank_details if role == "Farmer" else "",
+            "Bank Details": bank_details if role=="Farmer" else "",
             "Edit Code": edit_code
         }
-        st.session_state.history.append(df.copy())  # save state for undo
+        st.session_state.history.append(df.copy())
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
         df.to_csv(CSV_FILE, index=False)
-
         st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
 
         # Role-specific WhatsApp messages
-        if role == "Farmer":
-            message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
-        elif role == "Buyer":
-            message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}."
-        else:
-            message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
-
-        wa_link = get_whatsapp_link(contact, message)
+        message_map = {
+            "Farmer": f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}.",
+            "Buyer": f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}.",
+            "Volunteer": f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
+        }
+        wa_link = get_whatsapp_link(contact, message_map[role])
         if wa_link:
             st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
         else:
             st.warning("⚠️ Phone number invalid or WhatsApp not available. Registration cannot proceed.")
-
     else:
         st.error("❌ Please fill in all required fields.")
 
-# -----------------------
-# Edit/Delete Section Fix
-# -----------------------
+# Edit/Delete section
 st.subheader("✏️ Edit or Delete Your Entry")
-edit_code_input = st.text_input("Enter your edit code", key="edit_code_input")
-find_entry = st.button("Find Entry", key="find_entry_btn")
+edit_code_input = st.text_input("Enter your edit code")
+find_pressed = st.button("Find Entry")
 
-if find_entry:
+if find_pressed or st.session_state.get("editing_entry"):
     entry = df[df["Edit Code"] == edit_code_input]
     if not entry.empty:
+        st.session_state["editing_entry"] = True
         st.write("Your current entry:", entry)
         
-        action = st.radio("Choose action:", ["Edit", "Delete"], key="edit_delete_radio")
-
+        action = st.radio("Choose action:", ["Edit", "Delete"], key="action_radio")
+        
         if action == "Edit":
             with st.form("edit_form"):
-                new_name = st.text_input("Name", entry.iloc[0]["Name"], key="edit_name")
-                new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"], key="edit_crop")
-                new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"], key="edit_quantity")
-                new_address = st.text_area("Address", entry.iloc[0]["Address"], key="edit_address")
-                new_contact = st.text_input("Contact", entry.iloc[0]["Contact"], key="edit_contact")
-                new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""), key="edit_bank")
-                
+                new_name = st.text_input("Name", entry.iloc[0]["Name"])
+                new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"])
+                new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"])
+                new_address = st.text_area("Address", entry.iloc[0]["Address"])
+                new_contact = st.text_input("Contact", entry.iloc[0]["Contact"])
+                new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
                 save_changes = st.form_submit_button("Save Changes")
                 if save_changes:
                     st.session_state.history.append(df.copy())
@@ -147,44 +136,32 @@ if find_entry:
                     ]
                     df.to_csv(CSV_FILE, index=False)
                     st.success("✅ Entry updated successfully!")
-
-        elif action == "Delete":
-            delete_btn = st.button("Confirm Delete", key="delete_btn")
-            if delete_btn:
+                    st.session_state.pop("editing_entry")
+        else:  # Delete
+            delete_confirm = st.button("Confirm Delete")
+            if delete_confirm:
                 st.session_state.history.append(df.copy())
                 df = df[df["Edit Code"] != edit_code_input]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("🗑️ Entry deleted successfully!")
-
+                st.session_state.pop("editing_entry")
     else:
         st.error("❌ No entry found with that edit code.")
 
-# Tabs
+# Tabs for display
 tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
     st.write("👨‍🌾 Farmers and their crops:")
-    farmers = df[df["Role"] == "Farmer"]
-    farmers = farmers.drop(columns=[c for c in ["Edit Code"] if c in farmers.columns])
-    if not farmers.empty:
-        st.dataframe(farmers.reset_index(drop=True), use_container_width=True)
-    else:
-        st.info("No farmers yet.")
+    farmers = df[df["Role"]=="Farmer"].drop(columns=["Edit Code"])
+    st.dataframe(farmers.reset_index(drop=True), use_container_width=True) if not farmers.empty else st.info("No farmers yet.")
 
 with tab2:
     st.write("🛒 Buyers and their requirements:")
-    buyers = df[df["Role"] == "Buyer"]
-    buyers = buyers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in buyers.columns])
-    if not buyers.empty:
-        st.dataframe(buyers.reset_index(drop=True), use_container_width=True)
-    else:
-        st.info("No buyers yet.")
+    buyers = df[df["Role"]=="Buyer"].drop(columns=["Edit Code","Bank Details"])
+    st.dataframe(buyers.reset_index(drop=True), use_container_width=True) if not buyers.empty else st.info("No buyers yet.")
 
 with tab3:
     st.write("🤝 Volunteers and their offers:")
-    volunteers = df[df["Role"] == "Volunteer"]
-    volunteers = volunteers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in volunteers.columns])
-    if not volunteers.empty:
-        st.dataframe(volunteers.reset_index(drop=True), use_container_width=True)
-    else:
-        st.info("No volunteers yet.")
+    volunteers = df[df["Role"]=="Volunteer"].drop(columns=["Edit Code","Bank Details"])
+    st.dataframe(volunteers.reset_index(drop=True), use_container_width=True) if not volunteers.empty else st.info("No volunteers yet.")
