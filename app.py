@@ -33,76 +33,48 @@ else:
                                "Contact", "Bank Details", "Edit Code"])
     df.to_csv(CSV_FILE, index=False)
 
-# Session state for undo/redo
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "future" not in st.session_state:
-    st.session_state.future = []
-
-# Session state for role-specific fields
-if "role" not in st.session_state:
-    st.session_state.role = "Farmer"
-
 # App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
 
-# Sidebar – Undo/Redo
-st.sidebar.header("⚙️ Options")
-if st.sidebar.button("↩️ Undo"):
-    if st.session_state.history:
-        last_state = st.session_state.history.pop()
-        st.session_state.future.append(df.copy())
-        df = last_state
-        df.to_csv(CSV_FILE, index=False)
-        st.sidebar.success("Undid last change")
-if st.sidebar.button("↪️ Redo"):
-    if st.session_state.future:
-        next_state = st.session_state.future.pop()
-        st.session_state.history.append(df.copy())
-        df = next_state
-        df.to_csv(CSV_FILE, index=False)
-        st.sidebar.success("Redid last change")
-
-# --- Form ---
+# Form
 with st.form("entry_form"):
     name = st.text_input("Your Name")
+    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select")
     
-    # Role selection
-    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], index=["Farmer","Buyer","Volunteer"].index(st.session_state.role))
-    st.session_state.role = role  # update session
-    
-    # Dynamic field label based on role
+    # Show field dynamically based on role
     if role == "Farmer":
-        main_label = "Crop"
-        bank_details = st.text_input("Bank Details (optional, for Farmers only)")
+        crop_or_need = st.text_input("Crop")
+        bank_details = st.text_input("Bank Details (optional)")
     elif role == "Buyer":
-        main_label = "Requirement"
+        crop_or_need = st.text_input("Requirement")
         bank_details = ""
-    else:
-        main_label = "Support"
+    else:  # Volunteer
+        crop_or_need = st.text_input("Support Offer")
         bank_details = ""
-    
-    crop_or_need = st.text_input(main_label)
+
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
-    
+
     submitted = st.form_submit_button("Submit")
 
 if submitted:
     if not (name and role and crop_or_need and address and contact):
         st.error("❌ Please fill in all required fields.")
     else:
-        # WhatsApp confirmation mandatory
-        wa_message = f"Hello {name}, thanks for registering as {role} on AgriLink!"
-        wa_link = get_whatsapp_link(contact, wa_message)
-        
+        # Generate edit code
+        edit_code = generate_code()
+
+        # WhatsApp message with edit code
+        message = f"Hello {name}, thanks for registering as {role} on AgriLink! Your edit code is {edit_code}."
+        wa_link = get_whatsapp_link(contact, message)
+
         if wa_link:
             st.info("✅ WhatsApp confirmation is required. Click the link below to open WhatsApp and send the message.")
             st.markdown(f"[Open WhatsApp and send message]({wa_link})", unsafe_allow_html=True)
-            
+
             if st.button("✅ I sent the WhatsApp message"):
-                edit_code = generate_code()
+                # Save entry only after WhatsApp confirmation
                 new_entry = {
                     "Name": name,
                     "Role": role,
@@ -113,48 +85,45 @@ if submitted:
                     "Bank Details": bank_details if role == "Farmer" else "",
                     "Edit Code": edit_code
                 }
-                st.session_state.history.append(df.copy())
                 df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
                 df.to_csv(CSV_FILE, index=False)
                 st.success(f"✅ Registration complete! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
         else:
-            st.error("⚠️ Phone number invalid. Must be a valid WhatsApp number.")
+            st.error("⚠️ Phone number invalid or not a WhatsApp number. Registration cannot continue.")
 
-# --- Edit/Delete section ---
+# Edit/Delete section
 st.subheader("✏️ Edit or Delete Your Entry")
-edit_code_input = st.text_input("Enter your edit code")
+edit_code_input = st.text_input("Enter your edit code to edit/delete entry")
 if st.button("Find Entry"):
     entry = df[df["Edit Code"] == edit_code_input]
     if not entry.empty:
         st.write("Your current entry:", entry)
+
         action = st.radio("Choose action:", ["Edit", "Delete"])
-        
         if action == "Edit":
             new_name = st.text_input("Name", entry.iloc[0]["Name"])
-            new_crop_or_need = st.text_input(main_label, entry.iloc[0]["Crop/Need"])
+            new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"])
             new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"])
             new_address = st.text_area("Address", entry.iloc[0]["Address"])
             new_contact = st.text_input("Contact", entry.iloc[0]["Contact"])
             new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
-            
+
             if st.button("Save Changes"):
-                st.session_state.history.append(df.copy())
                 df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
                     new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
                 ]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("✅ Entry updated successfully!")
-        
+
         elif action == "Delete":
             if st.button("Confirm Delete"):
-                st.session_state.history.append(df.copy())
                 df = df[df["Edit Code"] != edit_code_input]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("🗑️ Entry deleted successfully!")
     else:
         st.error("❌ No entry found with that edit code.")
 
-# --- Tabs ---
+# Tabs
 tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
