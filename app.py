@@ -60,7 +60,7 @@ if st.sidebar.button("↪️ Redo"):
         st.sidebar.success("Redid last change")
 
 # Role selection outside the form
-role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
+role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select")
 
 # Determine the label dynamically
 if role == "Farmer":
@@ -116,37 +116,46 @@ if submitted:
     else:
         st.error("❌ Please fill in all required fields.")
 
-# Edit/Delete section
+# -----------------------
+# Edit/Delete Section Fix
+# -----------------------
 st.subheader("✏️ Edit or Delete Your Entry")
-edit_code_input = st.text_input("Enter your edit code")
-if st.button("Find Entry"):
+edit_code_input = st.text_input("Enter your edit code", key="edit_code_input")
+find_entry = st.button("Find Entry", key="find_entry_btn")
+
+if find_entry:
     entry = df[df["Edit Code"] == edit_code_input]
     if not entry.empty:
         st.write("Your current entry:", entry)
+        
+        action = st.radio("Choose action:", ["Edit", "Delete"], key="edit_delete_radio")
 
-        action = st.radio("Choose action:", ["Edit", "Delete"])
         if action == "Edit":
-            new_name = st.text_input("Name", entry.iloc[0]["Name"])
-            new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"])
-            new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"])
-            new_address = st.text_area("Address", entry.iloc[0]["Address"])
-            new_contact = st.text_input("Contact", entry.iloc[0]["Contact"])
-            new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
-
-            if st.button("Save Changes"):
-                st.session_state.history.append(df.copy())
-                df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
-                    new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
-                ]
-                df.to_csv(CSV_FILE, index=False)
-                st.success("✅ Entry updated successfully!")
+            with st.form("edit_form"):
+                new_name = st.text_input("Name", entry.iloc[0]["Name"], key="edit_name")
+                new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"], key="edit_crop")
+                new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"], key="edit_quantity")
+                new_address = st.text_area("Address", entry.iloc[0]["Address"], key="edit_address")
+                new_contact = st.text_input("Contact", entry.iloc[0]["Contact"], key="edit_contact")
+                new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""), key="edit_bank")
+                
+                save_changes = st.form_submit_button("Save Changes")
+                if save_changes:
+                    st.session_state.history.append(df.copy())
+                    df.loc[df["Edit Code"] == edit_code_input, ["Name","Crop/Need","Quantity","Address","Contact","Bank Details"]] = [
+                        new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
+                    ]
+                    df.to_csv(CSV_FILE, index=False)
+                    st.success("✅ Entry updated successfully!")
 
         elif action == "Delete":
-            if st.button("Confirm Delete"):
+            delete_btn = st.button("Confirm Delete", key="delete_btn")
+            if delete_btn:
                 st.session_state.history.append(df.copy())
                 df = df[df["Edit Code"] != edit_code_input]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("🗑️ Entry deleted successfully!")
+
     else:
         st.error("❌ No entry found with that edit code.")
 
