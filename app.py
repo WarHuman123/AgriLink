@@ -1,110 +1,147 @@
 import streamlit as st
 import pandas as pd
-import os
 import random
 import string
+import phonenumbers
+import os
 
-# CSV file
+# CSV file path
 CSV_FILE = "agrilink_data.csv"
 
-# Initialize CSV if not exists
-if not os.path.exists(CSV_FILE):
-    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details", "Edit Code"])
-    df.to_csv(CSV_FILE, index=False)
-
-# Load data
-df = pd.read_csv(CSV_FILE)
-
-st.set_page_config(page_title="AgriLink", layout="wide")
-st.title("🌱 AgriLink – Connecting Farmers, Volunteers & Buyers")
-
-st.sidebar.header("Register / Offer Help")
-
-# Generate random edit code
+# Generate unique edit code
 def generate_code(length=6):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-# ----------------------------
-# FORM FOR NEW ENTRY
-# ----------------------------
-with st.sidebar.form("user_form"):
-    name = st.text_input("Name")
-    role = st.selectbox("I am a", ["Farmer", "Volunteer", "Buyer"])
-    crop_or_need = st.text_input("Crop (if Farmer) / Need (if Volunteer or Buyer)")
-    quantity = st.text_input("Quantity / Support")
-    address = st.text_area("Address (Village/District/State)")
-    contact = st.text_input("Contact (Phone/Email)")
-    
-    bank_details = ""
-    if role == "Farmer":
-        bank_details = st.text_input("Bank Details (Optional)", placeholder="Account No, IFSC, Bank Name")
-    
+# WhatsApp link generator
+def get_whatsapp_link(number, message):
+    try:
+        parsed = phonenumbers.parse(number, "IN")  # Default India
+        if phonenumbers.is_valid_number(parsed):
+            clean_number = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+            link = f"https://wa.me/{clean_number.replace('+', '')}?text={message.replace(' ', '%20')}"
+            return link
+        else:
+            return None
+    except:
+        return None
+
+# Load or create CSV
+if os.path.exists(CSV_FILE):
+    df = pd.read_csv(CSV_FILE)
+else:
+    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
+                               "Contact", "Bank Details", "Edit Code"])
+    df.to_csv(CSV_FILE, index=False)
+
+# Session state for undo/redo
+if "history" not in st.session_state:
+    st.session_state.history = []
+if "future" not in st.session_state:
+    st.session_state.future = []
+
+# App title
+st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
+
+# Sidebar – Undo/Redo
+st.sidebar.header("⚙️ Options")
+if st.sidebar.button("↩️ Undo"):
+    if st.session_state.history:
+        last_state = st.session_state.history.pop()
+        st.session_state.future.append(df.copy())
+        df = last_state
+        df.to_csv(CSV_FILE, index=False)
+        st.sidebar.success("Undid last change")
+if st.sidebar.button("↪️ Redo"):
+    if st.session_state.future:
+        next_state = st.session_state.future.pop()
+        st.session_state.history.append(df.copy())
+        df = next_state
+        df.to_csv(CSV_FILE, index=False)
+        st.sidebar.success("Redid last change")
+
+# Form
+with st.form("entry_form"):
+    name = st.text_input("Your Name")
+    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
+    crop_or_need = st.text_input("Crop (if Farmer) / Requirement (if Buyer) / Support (if Volunteer)")
+    quantity = st.text_input("Quantity (optional)")
+    address = st.text_area("Address / Location")
+    contact = st.text_input("Contact Number")
+    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role == "Farmer" else ""
     submitted = st.form_submit_button("Submit")
 
-    if submitted:
-        if name and role and crop_or_need and address and contact:
-            edit_code = generate_code()
-            new_entry = {
-                "Name": name,
-                "Role": role,
-                "Crop/Need": crop_or_need,
-                "Quantity": quantity,
-                "Address": address,
-                "Contact": contact,
-                "Bank Details": bank_details if role == "Farmer" else "",
-                "Edit Code": edit_code
-            }
-            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            df.to_csv(CSV_FILE, index=False)
-            st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
+if submitted:
+    if name and role and crop_or_need and address and contact:
+        edit_code = generate_code()
+        new_entry = {
+            "Name": name,
+            "Role": role,
+            "Crop/Need": crop_or_need,
+            "Quantity": quantity,
+            "Address": address,
+            "Contact": contact,
+            "Bank Details": bank_details if role == "Farmer" else "",
+            "Edit Code": edit_code
+        }
+        st.session_state.history.append(df.copy())  # save state for undo
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+        df.to_csv(CSV_FILE, index=False)
+
+        st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
+
+        # Role-specific WhatsApp messages
+        if role == "Farmer":
+            message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
+        elif role == "Buyer":
+            message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}."
+        elif role == "Volunteer":
+            message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
         else:
-            st.error("⚠️ Please fill all required fields.")
+            message = f"Hello {name}, thanks for joining AgriLink! Your edit code is {edit_code}."
 
-# ----------------------------
-# EDIT / DELETE ENTRY
-# ----------------------------
-st.sidebar.header("Edit / Delete My Entry")
-with st.sidebar.form("edit_form"):
-    user_code = st.text_input("Enter your Edit Code")
-    action = st.radio("Action", ["Edit", "Delete"])
-    confirm = st.form_submit_button("Proceed")
+        wa_link = get_whatsapp_link(contact, message)
+        if wa_link:
+            st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
+        else:
+            st.warning("⚠️ Phone number invalid. Could not generate WhatsApp link.")
+    else:
+        st.error("❌ Please fill in all required fields.")
 
-    if confirm:
-        if user_code in df["Edit Code"].values:
-            row_index = df.index[df["Edit Code"] == user_code][0]
-            if action == "Delete":
-                df = df.drop(row_index)
+# Edit/Delete section
+st.subheader("✏️ Edit or Delete Your Entry")
+edit_code_input = st.text_input("Enter your edit code")
+if st.button("Find Entry"):
+    entry = df[df["Edit Code"] == edit_code_input]
+    if not entry.empty:
+        st.write("Your current entry:", entry)
+
+        action = st.radio("Choose action:", ["Edit", "Delete"])
+        if action == "Edit":
+            new_name = st.text_input("Name", entry.iloc[0]["Name"])
+            new_crop_or_need = st.text_input("Crop/Need", entry.iloc[0]["Crop/Need"])
+            new_quantity = st.text_input("Quantity", entry.iloc[0]["Quantity"])
+            new_address = st.text_area("Address", entry.iloc[0]["Address"])
+            new_contact = st.text_input("Contact", entry.iloc[0]["Contact"])
+            new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
+
+            if st.button("Save Changes"):
+                st.session_state.history.append(df.copy())
+                df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
+                    new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
+                ]
                 df.to_csv(CSV_FILE, index=False)
-                st.sidebar.success("🗑️ Entry deleted successfully!")
-            elif action == "Edit":
-                st.sidebar.info("✏️ Update your details below:")
+                st.success("✅ Entry updated successfully!")
 
-                with st.sidebar.form("update_form"):
-                    upd_name = st.text_input("Name", df.loc[row_index, "Name"])
-                    upd_crop = st.text_input("Crop/Need", df.loc[row_index, "Crop/Need"])
-                    upd_quantity = st.text_input("Quantity", df.loc[row_index, "Quantity"])
-                    upd_address = st.text_area("Address", df.loc[row_index, "Address"])
-                    upd_contact = st.text_input("Contact", df.loc[row_index, "Contact"])
-                    upd_bank = st.text_input("Bank Details", df.loc[row_index, "Bank Details"])
-                    save_changes = st.form_submit_button("Save Changes")
+        elif action == "Delete":
+            if st.button("Confirm Delete"):
+                st.session_state.history.append(df.copy())
+                df = df[df["Edit Code"] != edit_code_input]
+                df.to_csv(CSV_FILE, index=False)
+                st.success("🗑️ Entry deleted successfully!")
+    else:
+        st.error("❌ No entry found with that edit code.")
 
-                    if save_changes:
-                        df.loc[row_index, "Name"] = upd_name
-                        df.loc[row_index, "Crop/Need"] = upd_crop
-                        df.loc[row_index, "Quantity"] = upd_quantity
-                        df.loc[row_index, "Address"] = upd_address
-                        df.loc[row_index, "Contact"] = upd_contact
-                        df.loc[row_index, "Bank Details"] = upd_bank
-                        df.to_csv(CSV_FILE, index=False)
-                        st.sidebar.success("✅ Entry updated successfully!")
-        else:
-            st.sidebar.error("❌ Invalid Edit Code!")
-
-# ----------------------------
-# DISPLAY COMMUNITY BOARDS
-# ----------------------------
-st.subheader("📋 Community Board")
-
+# Tabs
 tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
