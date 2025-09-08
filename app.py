@@ -33,102 +33,76 @@ else:
                                "Contact", "Bank Details", "Edit Code"])
     df.to_csv(CSV_FILE, index=False)
 
-# Session state for Undo/Redo
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "future" not in st.session_state:
-    st.session_state.future = []
-
+# App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
 
-# Sidebar Undo/Redo
-st.sidebar.header("⚙️ Options")
-if st.sidebar.button("↩️ Undo"):
-    if st.session_state.history:
-        last_state = st.session_state.history.pop()
-        st.session_state.future.append(df.copy())
-        df = last_state
-        df.to_csv(CSV_FILE, index=False)
-        st.sidebar.success("Undid last change")
-if st.sidebar.button("↪️ Redo"):
-    if st.session_state.future:
-        next_state = st.session_state.future.pop()
-        st.session_state.history.append(df.copy())
-        df = next_state
-        df.to_csv(CSV_FILE, index=False)
-        st.sidebar.success("Redid last change")
-
-# Role selection outside form
-if "role" not in st.session_state:
-    st.session_state.role = "Farmer"
-
-role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select")
-st.session_state.role = role
-
-# Dynamic label
-if role == "Farmer":
-    label = "Crop"
-elif role == "Buyer":
-    label = "Requirement"
-else:
-    label = "Support"
-
-# Form
+# ---- Form ----
 with st.form("entry_form"):
-    name = st.text_input("Your Name")
-    crop_or_need = st.text_input(label)
-    quantity = st.text_input("Quantity (optional)")
-    address = st.text_area("Address / Location")
-    contact = st.text_input("Contact Number")
-    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role == "Farmer" else ""
+    name = st.text_input("Your Name", key="name_input")
+    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select")
+
+    # Dynamic label depending on role
+    if role == "Farmer":
+        label = "Crop Name"
+    elif role == "Buyer":
+        label = "Requirement"
+    else:
+        label = "Support / Service Offered"
+
+    crop_or_need = st.text_input(label, key="crop_or_need_input")
+    quantity = st.text_input("Quantity (optional)", key="quantity_input")
+    address = st.text_area("Address / Location", key="address_input")
+    contact = st.text_input("Contact Number (WhatsApp required)", key="contact_input")
+
+    bank_details = st.text_input("Bank Details (optional, for Farmers only)", key="bank_input") if role == "Farmer" else ""
+
     submitted = st.form_submit_button("Submit")
 
 if submitted:
+    # Validate required fields
     if not (name and role and crop_or_need and address and contact):
         st.error("❌ Please fill in all required fields.")
     else:
-        # WhatsApp mandatory check
-        wa_link_test = get_whatsapp_link(contact, "Test message")
-        if not wa_link_test:
-            st.error("❌ The provided number does not have WhatsApp. Registration not allowed.")
+        # Check if number has WhatsApp
+        wa_test = get_whatsapp_link(contact, "Test message")
+        if not wa_test:
+            st.error("❌ This number does not have WhatsApp. Registration not allowed.")
         else:
-            edit_code = generate_code()
-            new_entry = {
-                "Name": name,
-                "Role": role,
-                "Crop/Need": crop_or_need,
-                "Quantity": quantity,
-                "Address": address,
-                "Contact": contact,
-                "Bank Details": bank_details if role == "Farmer" else "",
-                "Edit Code": edit_code
-            }
-            st.session_state.history.append(df.copy())  # Save for undo
-            df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-            df.to_csv(CSV_FILE, index=False)
-
-            st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
-
-            # Role-specific WhatsApp message
+            # Role-specific message
             if role == "Farmer":
-                message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
+                message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved."
             elif role == "Buyer":
-                message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}."
-            else:  # Volunteer
-                message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
+                message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted."
+            else:
+                message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded."
 
             wa_link = get_whatsapp_link(contact, message)
 
-            # Auto-open WhatsApp
-            st.markdown(f"""
-                <script>
-                window.open("{wa_link}", "_blank");
-                </script>
-            """, unsafe_allow_html=True)
+            # Show WhatsApp confirmation
+            st.markdown("""
+                ### ✅ WhatsApp Confirmation Required
+                Please click the button below to open WhatsApp and send the confirmation message **before your registration is saved**.
+            """)
+            if st.button("Send WhatsApp Confirmation"):
+                # Save entry only after WhatsApp confirmation
+                edit_code = generate_code()
+                new_entry = {
+                    "Name": name,
+                    "Role": role,
+                    "Crop/Need": crop_or_need,
+                    "Quantity": quantity,
+                    "Address": address,
+                    "Contact": contact,
+                    "Bank Details": bank_details if role == "Farmer" else "",
+                    "Edit Code": edit_code
+                }
+                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+                df.to_csv(CSV_FILE, index=False)
 
-            st.info("✅ WhatsApp confirmation is being opened automatically. Please send the message to complete registration.")
+                st.markdown(f"[Click here to open WhatsApp and send message]({wa_link})", unsafe_allow_html=True)
+                st.success(f"✅ Registration completed! Your edit code is: **{edit_code}**. Save it to edit/delete later.")
 
-# Edit/Delete section
+# ---- Edit/Delete section ----
 st.subheader("✏️ Edit or Delete Your Entry")
 edit_code_input = st.text_input("Enter your edit code")
 if st.button("Find Entry"):
@@ -146,7 +120,6 @@ if st.button("Find Entry"):
             new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
 
             if st.button("Save Changes"):
-                st.session_state.history.append(df.copy())
                 df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
                     new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
                 ]
@@ -155,14 +128,13 @@ if st.button("Find Entry"):
 
         elif action == "Delete":
             if st.button("Confirm Delete"):
-                st.session_state.history.append(df.copy())
                 df = df[df["Edit Code"] != edit_code_input]
                 df.to_csv(CSV_FILE, index=False)
                 st.success("🗑️ Entry deleted successfully!")
     else:
         st.error("❌ No entry found with that edit code.")
 
-# Tabs
+# ---- Tabs ----
 tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
