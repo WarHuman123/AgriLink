@@ -109,7 +109,8 @@ tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
     st.write("👨‍🌾 Farmers and their crops:")
-    farmers = df[df["Role"] == "Farmer"].drop(columns=["Edit Code"])
+    farmers = df[df["Role"] == "Farmer"]
+    farmers = farmers.drop(columns=[c for c in ["Edit Code"] if c in farmers.columns])
     if not farmers.empty:
         st.dataframe(farmers, use_container_width=True)
     else:
@@ -117,7 +118,8 @@ with tab1:
 
 with tab2:
     st.write("🛒 Buyers and their requirements:")
-    buyers = df[df["Role"] == "Buyer"].drop(columns=["Edit Code", "Bank Details"])
+    buyers = df[df["Role"] == "Buyer"]
+    buyers = buyers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in buyers.columns])
     if not buyers.empty:
         st.dataframe(buyers, use_container_width=True)
     else:
@@ -125,7 +127,8 @@ with tab2:
 
 with tab3:
     st.write("🤝 Volunteers and their offers:")
-    volunteers = df[df["Role"] == "Volunteer"].drop(columns=["Edit Code", "Bank Details"])
+    volunteers = df[df["Role"] == "Volunteer"]
+    volunteers = volunteers.drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in volunteers.columns])
     if not volunteers.empty:
         st.dataframe(volunteers, use_container_width=True)
     else:
