@@ -3,7 +3,7 @@ import pandas as pd
 import random
 import string
 
-# File to save data
+# CSV file for saving registrations
 CSV_FILE = "registrations.csv"
 
 # Load or initialize dataframe
@@ -20,13 +20,15 @@ def generate_code(length=6):
 def get_whatsapp_link(phone, message):
     return f"https://wa.me/{phone}?text={message.replace(' ', '%20')}"
 
-st.title("🌾 AgriLink Registration")
+# App title
+st.title("🌾 AgriLink Registration Portal")
 
+# Registration form
 with st.form("registration_form", clear_on_submit=True):
     name = st.text_input("Name")
     role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
 
-    # Dynamic fields
+    # Role-based dynamic fields
     if role == "Farmer":
         crop = st.text_input("Crop")
         quantity = st.text_input("Quantity")
@@ -48,17 +50,22 @@ with st.form("registration_form", clear_on_submit=True):
 
     submitted = st.form_submit_button("Submit")
 
+# On form submit
 if submitted:
     if not contact.startswith("91") or not contact.isdigit():
         st.error("❌ Enter a valid WhatsApp number with country code (e.g. 91xxxxxxxxxx).")
     else:
+        # Generate edit code
         edit_code = generate_code()
+
+        # WhatsApp confirmation message
         wa_message = f"Hello {name}, thanks for registering as {role} on AgriLink! Your edit code is {edit_code}."
         wa_link = get_whatsapp_link(contact, wa_message)
 
         st.info("✅ WhatsApp confirmation is required. Click below to open WhatsApp and send the message.")
         st.markdown(f"[📲 Open WhatsApp and send message]({wa_link})", unsafe_allow_html=True)
 
+        # Button after sending WhatsApp
         if st.button("✅ I sent the WhatsApp message"):
             new_entry = {
                 "Name": name,
@@ -70,9 +77,13 @@ if submitted:
                 "Bank Details": bank_details,
                 "Edit Code": edit_code
             }
+            # Save entry
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
             df.to_csv(CSV_FILE, index=False)
+
+            # Show success
             st.success(f"✅ Registration complete! Your edit code is: **{edit_code}**. Save it for later updates.")
 
+            # Show updated table
             st.subheader("📋 Current Registrations")
             st.dataframe(df)
