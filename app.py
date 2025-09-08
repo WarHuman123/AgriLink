@@ -59,28 +59,21 @@ if st.sidebar.button("↪️ Redo"):
         df.to_csv(CSV_FILE, index=False)
         st.sidebar.success("Redid last change")
 
-# Dynamic role selection outside the form
-role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select")
+# Role selection outside the form
+role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
 
-# Force rerun if role changes to update the form label
-if "role_prev" not in st.session_state:
-    st.session_state.role_prev = role
-if st.session_state.role_prev != role:
-    st.session_state.role_prev = role
-    st.experimental_rerun()
-
-# Determine field label based on role
+# Determine the label dynamically
 if role == "Farmer":
-    field_label = "Crop"
+    crop_label = "Crop"
 elif role == "Buyer":
-    field_label = "Requirement"
+    crop_label = "Requirement"
 else:
-    field_label = "Support"
+    crop_label = "Support"
 
 # Form
 with st.form("entry_form"):
     name = st.text_input("Your Name")
-    crop_or_need = st.text_input(f"{field_label} (mandatory)")
+    crop_or_need = st.text_input(crop_label)
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
@@ -111,16 +104,15 @@ if submitted:
             message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
         elif role == "Buyer":
             message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}."
-        elif role == "Volunteer":
-            message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
         else:
-            message = f"Hello {name}, thanks for joining AgriLink! Your edit code is {edit_code}."
+            message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
 
         wa_link = get_whatsapp_link(contact, message)
         if wa_link:
             st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
         else:
-            st.warning("⚠️ Phone number invalid. Could not generate WhatsApp link.")
+            st.warning("⚠️ Phone number invalid or WhatsApp not available. Registration cannot proceed.")
+
     else:
         st.error("❌ Please fill in all required fields.")
 
