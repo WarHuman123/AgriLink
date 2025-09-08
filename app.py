@@ -25,20 +25,13 @@ def get_whatsapp_link(number, message):
     except:
         return None
 
-# Function to reset CSV
-def reset_csv():
-    if os.path.exists(CSV_FILE):
-        os.remove(CSV_FILE)
-    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
-                               "Contact", "Bank Details", "Edit Code"])
-    df.to_csv(CSV_FILE, index=False)
-    return df
-
 # Load or create CSV
 if os.path.exists(CSV_FILE):
     df = pd.read_csv(CSV_FILE)
 else:
-    df = reset_csv()
+    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
+                               "Contact", "Bank Details", "Edit Code"])
+    df.to_csv(CSV_FILE, index=False)
 
 # Session state for undo/redo
 if "history" not in st.session_state:
@@ -49,7 +42,7 @@ if "future" not in st.session_state:
 # App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
 
-# Sidebar – Undo/Redo + Reset Data
+# Sidebar – Undo/Redo/Reset
 st.sidebar.header("⚙️ Options")
 if st.sidebar.button("↩️ Undo"):
     if st.session_state.history:
@@ -58,6 +51,7 @@ if st.sidebar.button("↩️ Undo"):
         df = last_state
         df.to_csv(CSV_FILE, index=False)
         st.sidebar.success("Undid last change")
+
 if st.sidebar.button("↪️ Redo"):
     if st.session_state.future:
         next_state = st.session_state.future.pop()
@@ -65,11 +59,18 @@ if st.sidebar.button("↪️ Redo"):
         df = next_state
         df.to_csv(CSV_FILE, index=False)
         st.sidebar.success("Redid last change")
+
+# ✅ Reset Data button
 if st.sidebar.button("🗑️ Reset Data"):
-    df = reset_csv()
-    st.session_state.history = []
-    st.session_state.future = []
-    st.experimental_rerun()  # Refresh app
+    if os.path.exists(CSV_FILE):
+        os.remove(CSV_FILE)
+    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
+                               "Contact", "Bank Details", "Edit Code"])
+    df.to_csv(CSV_FILE, index=False)
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.success("✅ All data has been reset!")
+    st.experimental_rerun()
 
 # Role selection outside the form
 role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
