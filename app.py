@@ -36,15 +36,25 @@ else:
 # App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
 
+# Initialize role in session state
+if "role" not in st.session_state:
+    st.session_state.role = "Farmer"
+
+# Callback to update role
+def role_changed():
+    st.session_state.role = st.session_state.role_select
+
 # Form
 with st.form("entry_form"):
     name = st.text_input("Your Name")
-    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
+
+    # Role selector with callback
+    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_select", on_change=role_changed)
 
     # Dynamic label based on role
-    if role == "Farmer":
+    if st.session_state.role == "Farmer":
         label = "Crop"
-    elif role == "Buyer":
+    elif st.session_state.role == "Buyer":
         label = "Requirement"
     else:
         label = "Support"
@@ -53,11 +63,11 @@ with st.form("entry_form"):
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
-    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role == "Farmer" else ""
+    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if st.session_state.role == "Farmer" else ""
     submitted = st.form_submit_button("Submit")
 
 if submitted:
-    if not (name and role and crop_or_need and address and contact):
+    if not (name and st.session_state.role and crop_or_need and address and contact):
         st.error("❌ Please fill in all required fields.")
     else:
         # WhatsApp mandatory check
@@ -68,12 +78,12 @@ if submitted:
             edit_code = generate_code()
             new_entry = {
                 "Name": name,
-                "Role": role,
+                "Role": st.session_state.role,
                 "Crop/Need": crop_or_need,
                 "Quantity": quantity,
                 "Address": address,
                 "Contact": contact,
-                "Bank Details": bank_details if role == "Farmer" else "",
+                "Bank Details": bank_details if st.session_state.role == "Farmer" else "",
                 "Edit Code": edit_code
             }
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
@@ -82,9 +92,9 @@ if submitted:
             st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
 
             # Role-specific WhatsApp messages
-            if role == "Farmer":
+            if st.session_state.role == "Farmer":
                 message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
-            elif role == "Buyer":
+            elif st.session_state.role == "Buyer":
                 message = f"Hello {name}, 🛒 thanks for registering as a Buyer on AgriLink! Your requirement has been noted. Your edit code is {edit_code}."
             else:  # Volunteer
                 message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
@@ -100,7 +110,7 @@ if submitted:
 
             st.info("✅ WhatsApp confirmation is being opened automatically. Please send the message to complete registration.")
 
-# Edit/Delete section
+# Edit/Delete section (remains same)
 st.subheader("✏️ Edit or Delete Your Entry")
 edit_code_input = st.text_input("Enter your edit code")
 if st.button("Find Entry"):
@@ -132,7 +142,7 @@ if st.button("Find Entry"):
     else:
         st.error("❌ No entry found with that edit code.")
 
-# Tabs
+# Tabs (remains same)
 tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
