@@ -26,12 +26,15 @@ def get_whatsapp_link(number, message):
         return None
 
 # Load or create CSV
-if os.path.exists(CSV_FILE):
-    df = pd.read_csv(CSV_FILE)
-else:
-    df = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
-                               "Contact", "Bank Details", "Edit Code"])
-    df.to_csv(CSV_FILE, index=False)
+if "data" not in st.session_state:
+    if os.path.exists(CSV_FILE):
+        st.session_state["data"] = pd.read_csv(CSV_FILE)
+    else:
+        st.session_state["data"] = pd.DataFrame(columns=["Name", "Role", "Crop/Need", "Quantity", "Address",
+                                                        "Contact", "Bank Details", "Edit Code"])
+        st.session_state["data"].to_csv(CSV_FILE, index=False)
+
+df = st.session_state["data"]
 
 # App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
@@ -62,10 +65,7 @@ if submitted:
     if not (name and role and crop_or_need and address and contact):
         st.error("❌ Please fill in all required fields.")
     else:
-        # Generate edit code
         edit_code = generate_code()
-
-        # WhatsApp message with edit code
         message = f"Hello {name}, thanks for registering as {role} on AgriLink! Your edit code is {edit_code}."
         wa_link = get_whatsapp_link(contact, message)
 
@@ -74,7 +74,7 @@ if submitted:
             st.markdown(f"[Open WhatsApp and send message]({wa_link})", unsafe_allow_html=True)
 
             if st.button("✅ I sent the WhatsApp message"):
-                # Save entry only after WhatsApp confirmation
+                # Save entry in session state
                 new_entry = {
                     "Name": name,
                     "Role": role,
@@ -85,8 +85,8 @@ if submitted:
                     "Bank Details": bank_details if role == "Farmer" else "",
                     "Edit Code": edit_code
                 }
-                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                df.to_csv(CSV_FILE, index=False)
+                st.session_state["data"] = pd.concat([st.session_state["data"], pd.DataFrame([new_entry])], ignore_index=True)
+                st.session_state["data"].to_csv(CSV_FILE, index=False)
                 st.success(f"✅ Registration complete! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
         else:
             st.error("⚠️ Phone number invalid or not a WhatsApp number. Registration cannot continue.")
@@ -95,7 +95,7 @@ if submitted:
 st.subheader("✏️ Edit or Delete Your Entry")
 edit_code_input = st.text_input("Enter your edit code to edit/delete entry")
 if st.button("Find Entry"):
-    entry = df[df["Edit Code"] == edit_code_input]
+    entry = st.session_state["data"][st.session_state["data"]["Edit Code"] == edit_code_input]
     if not entry.empty:
         st.write("Your current entry:", entry)
 
@@ -109,16 +109,17 @@ if st.button("Find Entry"):
             new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
 
             if st.button("Save Changes"):
-                df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
-                    new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
-                ]
-                df.to_csv(CSV_FILE, index=False)
+                st.session_state["data"].loc[st.session_state["data"]["Edit Code"] == edit_code_input,
+                                             ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
+                                                 new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
+                                             ]
+                st.session_state["data"].to_csv(CSV_FILE, index=False)
                 st.success("✅ Entry updated successfully!")
 
         elif action == "Delete":
             if st.button("Confirm Delete"):
-                df = df[df["Edit Code"] != edit_code_input]
-                df.to_csv(CSV_FILE, index=False)
+                st.session_state["data"] = st.session_state["data"][st.session_state["data"]["Edit Code"] != edit_code_input]
+                st.session_state["data"].to_csv(CSV_FILE, index=False)
                 st.success("🗑️ Entry deleted successfully!")
     else:
         st.error("❌ No entry found with that edit code.")
@@ -128,7 +129,9 @@ tab1, tab2, tab3 = st.tabs(["🌾 Farmers", "🛒 Buyers", "🤝 Volunteers"])
 
 with tab1:
     st.write("👨‍🌾 Farmers and their crops:")
-    farmers = df[df["Role"] == "Farmer"].drop(columns=[c for c in ["Edit Code"] if c in df.columns])
+    farmers = st.session_state["data"][st.session_state["data"]["Role"] == "Farmer"].drop(
+        columns=[c for c in ["Edit Code"] if c in st.session_state["data"].columns]
+    )
     if not farmers.empty:
         st.dataframe(farmers, use_container_width=True)
     else:
@@ -136,7 +139,9 @@ with tab1:
 
 with tab2:
     st.write("🛒 Buyers and their requirements:")
-    buyers = df[df["Role"] == "Buyer"].drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in df.columns])
+    buyers = st.session_state["data"][st.session_state["data"]["Role"] == "Buyer"].drop(
+        columns=[c for c in ["Edit Code", "Bank Details"] if c in st.session_state["data"].columns]
+    )
     if not buyers.empty:
         st.dataframe(buyers, use_container_width=True)
     else:
@@ -144,7 +149,9 @@ with tab2:
 
 with tab3:
     st.write("🤝 Volunteers and their offers:")
-    volunteers = df[df["Role"] == "Volunteer"].drop(columns=[c for c in ["Edit Code", "Bank Details"] if c in df.columns])
+    volunteers = st.session_state["data"][st.session_state["data"]["Role"] == "Volunteer"].drop(
+        columns=[c for c in ["Edit Code", "Bank Details"] if c in st.session_state["data"].columns]
+    )
     if not volunteers.empty:
         st.dataframe(volunteers, use_container_width=True)
     else:
