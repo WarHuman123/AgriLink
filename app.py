@@ -36,29 +36,24 @@ else:
 # App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
 
-# Track role selection dynamically
-if "role_selected" not in st.session_state:
-    st.session_state.role_selected = "Farmer"
-
-role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_selected")
-
-# Dynamic field label
-if role == "Farmer":
-    field_label = "Crop"
-elif role == "Buyer":
-    field_label = "Requirement"
-else:
-    field_label = "Support"
-
 # Form
 with st.form("entry_form"):
     name = st.text_input("Your Name")
-    crop_or_need = st.text_input(field_label)
+    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
+
+    # Dynamic label based on role
+    if role == "Farmer":
+        label = "Crop"
+    elif role == "Buyer":
+        label = "Requirement"
+    else:
+        label = "Support"
+    crop_or_need = st.text_input(label)
+
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
     bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role == "Farmer" else ""
-
     submitted = st.form_submit_button("Submit")
 
 if submitted:
@@ -66,8 +61,8 @@ if submitted:
         st.error("❌ Please fill in all required fields.")
     else:
         # WhatsApp mandatory check
-        wa_link = get_whatsapp_link(contact, "Test message")
-        if not wa_link:
+        wa_link_test = get_whatsapp_link(contact, "Test message")
+        if not wa_link_test:
             st.error("❌ The provided number does not have WhatsApp. Registration not allowed.")
         else:
             edit_code = generate_code()
@@ -95,7 +90,15 @@ if submitted:
                 message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
 
             wa_link = get_whatsapp_link(contact, message)
-            st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
+
+            # Auto-open WhatsApp
+            st.markdown(f"""
+                <script>
+                window.open("{wa_link}", "_blank");
+                </script>
+            """, unsafe_allow_html=True)
+
+            st.info("✅ WhatsApp confirmation is being opened automatically. Please send the message to complete registration.")
 
 # Edit/Delete section
 st.subheader("✏️ Edit or Delete Your Entry")
