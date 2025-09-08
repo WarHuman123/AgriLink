@@ -36,25 +36,28 @@ else:
 # App title
 st.title("🌱 AgriLink – Connect Farmers, Buyers, and Volunteers")
 
+# Track role selection dynamically
+if "role_selected" not in st.session_state:
+    st.session_state.role_selected = "Farmer"
+
+role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"], key="role_selected")
+
+# Dynamic field label
+if role == "Farmer":
+    field_label = "Crop"
+elif role == "Buyer":
+    field_label = "Requirement"
+else:
+    field_label = "Support"
+
 # Form
 with st.form("entry_form"):
     name = st.text_input("Your Name")
-    role = st.selectbox("You are a:", ["Farmer", "Buyer", "Volunteer"])
-
-    # Dynamic field based on role
-    if role == "Farmer":
-        crop_or_need = st.text_input("Crop")
-        bank_details = st.text_input("Bank Details (optional, for Farmers only)")
-    elif role == "Buyer":
-        crop_or_need = st.text_input("Requirement")
-        bank_details = ""
-    else:  # Volunteer
-        crop_or_need = st.text_input("Support")
-        bank_details = ""
-
+    crop_or_need = st.text_input(field_label)
     quantity = st.text_input("Quantity (optional)")
     address = st.text_area("Address / Location")
     contact = st.text_input("Contact Number")
+    bank_details = st.text_input("Bank Details (optional, for Farmers only)") if role == "Farmer" else ""
 
     submitted = st.form_submit_button("Submit")
 
@@ -62,11 +65,11 @@ if submitted:
     if not (name and role and crop_or_need and address and contact):
         st.error("❌ Please fill in all required fields.")
     else:
-        wa_test = get_whatsapp_link(contact, "Test")
-        if not wa_test:
-            st.error("❌ Invalid phone number. Must be a valid WhatsApp number. Submission blocked.")
+        # WhatsApp mandatory check
+        wa_link = get_whatsapp_link(contact, "Test message")
+        if not wa_link:
+            st.error("❌ The provided number does not have WhatsApp. Registration not allowed.")
         else:
-            # Generate edit code and save entry
             edit_code = generate_code()
             new_entry = {
                 "Name": name,
@@ -81,7 +84,9 @@ if submitted:
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
             df.to_csv(CSV_FILE, index=False)
 
-            # Role-specific WhatsApp message
+            st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**. Save this code to edit/delete later.")
+
+            # Role-specific WhatsApp messages
             if role == "Farmer":
                 message = f"Hello {name}, 👨‍🌾 thanks for registering as a Farmer on AgriLink! Your crop details are saved. Your edit code is {edit_code}."
             elif role == "Buyer":
@@ -90,9 +95,7 @@ if submitted:
                 message = f"Hello {name}, 🤝 thanks for registering as a Volunteer on AgriLink! Your support offer is recorded. Your edit code is {edit_code}."
 
             wa_link = get_whatsapp_link(contact, message)
-            st.success(f"✅ Entry submitted successfully! Your edit code is: **{edit_code}**.")
-            st.markdown(f"""<script>window.open("{wa_link}", "_blank");</script>""", unsafe_allow_html=True)
-            st.info("🔒 WhatsApp confirmation is mandatory. A new tab has opened. Please send the confirmation before closing.")
+            st.markdown(f"👉 [Click here to send WhatsApp confirmation]({wa_link})")
 
 # Edit/Delete section
 st.subheader("✏️ Edit or Delete Your Entry")
@@ -112,28 +115,11 @@ if st.button("Find Entry"):
             new_bank = st.text_input("Bank Details", entry.iloc[0].get("Bank Details", ""))
 
             if st.button("Save Changes"):
-                wa_test = get_whatsapp_link(new_contact, "Test")
-                if not wa_test:
-                    st.error("❌ Invalid phone number. Must be a valid WhatsApp number. Update blocked.")
-                else:
-                    df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
-                        new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
-                    ]
-                    df.to_csv(CSV_FILE, index=False)
-
-                    # WhatsApp confirmation after edit
-                    role = df.loc[df["Edit Code"] == edit_code_input, "Role"].values[0]
-                    if role == "Farmer":
-                        message = f"Hello {new_name}, 👨‍🌾 your Farmer entry has been updated. Edit code: {edit_code_input}."
-                    elif role == "Buyer":
-                        message = f"Hello {new_name}, 🛒 your Buyer entry has been updated. Edit code: {edit_code_input}."
-                    else:
-                        message = f"Hello {new_name}, 🤝 your Volunteer entry has been updated. Edit code: {edit_code_input}."
-
-                    wa_link = get_whatsapp_link(new_contact, message)
-                    st.success("✅ Entry updated successfully!")
-                    st.markdown(f"""<script>window.open("{wa_link}", "_blank");</script>""", unsafe_allow_html=True)
-                    st.info("🔒 WhatsApp confirmation is mandatory. A new tab has opened. Please send the confirmation.")
+                df.loc[df["Edit Code"] == edit_code_input, ["Name", "Crop/Need", "Quantity", "Address", "Contact", "Bank Details"]] = [
+                    new_name, new_crop_or_need, new_quantity, new_address, new_contact, new_bank
+                ]
+                df.to_csv(CSV_FILE, index=False)
+                st.success("✅ Entry updated successfully!")
 
         elif action == "Delete":
             if st.button("Confirm Delete"):
